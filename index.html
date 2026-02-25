@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSE 时间推送</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 60px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 24px;
+      color: #94a3b8;
+      letter-spacing: 1px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: background 0.3s;
+    }
+
+    .status-dot.active {
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e88;
+    }
+
+    .btn {
+      padding: 8px 28px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-start {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .btn-start:hover {
+      background: #2563eb;
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-stop:hover {
+      background: #dc2626;
+    }
+
+    .list-wrapper {
+      background: #1e293b;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      overflow: hidden;
+    }
+
+    .list-header {
+      padding: 14px 20px;
+      font-size: 0.8rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .time-list {
+      list-style: none;
+      max-height: 460px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .time-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .time-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .time-list::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 2px;
+    }
+
+    .time-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1a2332;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.95rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .time-item:last-child {
+      border-bottom: none;
+    }
+
+    .time-item .index {
+      color: #475569;
+      font-size: 0.8rem;
+      min-width: 36px;
+    }
+
+    .time-item .time {
+      color: #e2e8f0;
+    }
+
+    .empty-tip {
+      padding: 48px 20px;
+      text-align: center;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SSE 时间推送</h1>
+
+    <div class="status-bar">
+      <div class="status">
+        <span class="status-dot" id="dot"></span>
+        <span id="statusText">未连接</span>
+      </div>
+      <button class="btn btn-start" id="toggleBtn">开始</button>
+    </div>
+
+    <div class="list-wrapper">
+      <div class="list-header">
+        <span>服务端推送时间</span>
+        <span id="countLabel">0 条</span>
+      </div>
+      <ul class="time-list" id="timeList">
+        <li class="empty-tip" id="emptyTip">点击「开始」接收服务端时间推送</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const btn       = document.getElementById('toggleBtn');
+    const dot       = document.getElementById('dot');
+    const statusTxt = document.getElementById('statusText');
+    const list      = document.getElementById('timeList');
+    const countLbl  = document.getElementById('countLabel');
+    const emptyTip  = document.getElementById('emptyTip');
+
+    let eventSource = null;
+    let count = 0;
+
+    btn.addEventListener('click', () => {
+      if (eventSource) {
+        stop();
+      } else {
+        start();
+      }
+    });
+
+    function start() {
+      eventSource = new EventSource('/sse');
+
+      eventSource.onopen = () => {
+        dot.classList.add('active');
+        statusTxt.textContent = '已连接';
+        btn.textContent = '停止';
+        btn.className = 'btn btn-stop';
+      };
+
+      eventSource.onmessage = (e) => {
+        if (emptyTip) emptyTip.remove();
+        count++;
+        const li = document.createElement('li');
+        li.className = 'time-item';
+        li.innerHTML = `<span class="index">#${count}</span><span class="time">${e.data}</span>`;
+        list.prepend(li);
+        countLbl.textContent = `${count} 条`;
+      };
+
+      eventSource.onerror = () => {
+        stop();
+      };
+    }
+
+    function stop() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      dot.classList.remove('active');
+      statusTxt.textContent = '未连接';
+      btn.textContent = '开始';
+      btn.className = 'btn btn-start';
+    }
+  </script>
+</body>
+</html>

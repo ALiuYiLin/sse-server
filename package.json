@@ -1,0 +1,9 @@
+{
+  "name": "sse-server",
+  "version": "1.0.0",
+  "description": "SSE Server - 每隔3秒推送当前时间",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
