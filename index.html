@@ -207,7 +207,7 @@
     });
 
     function start() {
-      eventSource = new EventSource('/sse');
+      eventSource = new EventSource('http://localhost:4444/sse');
 
       eventSource.onopen = () => {
         dot.classList.add('active');

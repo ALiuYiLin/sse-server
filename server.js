@@ -2,10 +2,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 4444;
+const SSE_PORT = 4444;
+const HTTP_PORT = 3323;
 
-const server = http.createServer((req, res) => {
-  // 处理 SSE 连接
+// ---- SSE 服务器 (端口 4444) ----
+const sseServer = http.createServer((req, res) => {
   if (req.url === '/sse') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -14,7 +15,6 @@ const server = http.createServer((req, res) => {
       'Access-Control-Allow-Origin': '*',
     });
 
-    // 立即推送一次
     const sendTime = () => {
       const now = new Date().toLocaleString('zh-CN', {
         year: 'numeric',
@@ -31,7 +31,6 @@ const server = http.createServer((req, res) => {
     sendTime();
     const timer = setInterval(sendTime, 3000);
 
-    // 客户端断开时清理定时器
     req.on('close', () => {
       clearInterval(timer);
       console.log('客户端断开连接');
@@ -40,7 +39,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 提供静态 HTML 页面
+  res.writeHead(404);
+  res.end('Not Found');
+});
+
+// ---- HTTP 静态服务器 (端口 3000) ----
+const httpServer = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/index.html') {
     const htmlPath = path.join(__dirname, 'index.html');
     fs.readFile(htmlPath, (err, data) => {
@@ -59,6 +63,10 @@ const server = http.createServer((req, res) => {
   res.end('Not Found');
 });
 
-server.listen(PORT, () => {
-  console.log(`SSE 服务器已启动: http://localhost:${PORT}`);
+sseServer.listen(SSE_PORT, () => {
+  console.log(`SSE  服务器已启动: http://localhost:${SSE_PORT}/sse`);
+});
+
+httpServer.listen(HTTP_PORT, () => {
+  console.log(`HTTP 服务器已启动: http://localhost:${HTTP_PORT}`);
 });
